@@ -271,3 +271,81 @@ class Player(Entity):
         self.import_player_assets()
         self.move(self.stats['speed'])
         self.energy_recovery()
+
+
+class AutoPlayer(Player):
+    """
+    Player variant that moves automatically between patrol points and triggers
+    melee attacks on a fixed cadence. Helpful for AI companions or demo reels.
+    """
+
+    def __init__(
+        self,
+        pos,
+        groups,
+        obstacle_sprites,
+        create_attack,
+        destroy_attack,
+        create_magic,
+        player_data,
+        patrol_points=None,
+        attack_interval=2000,
+        patrol_tolerance=4,
+        auto_attack=True,
+    ):
+        """
+        Args:
+            patrol_points (list[tuple[int, int]] | None): optional patrol path.
+                Defaults to staying at the spawn point.
+            attack_interval (int): milliseconds between auto-attacks.
+            patrol_tolerance (int | float): radius in pixels considered "at waypoint".
+            auto_attack (bool): disable to run patrol-only demonstrations.
+        """
+        super().__init__(
+            pos,
+            groups,
+            obstacle_sprites,
+            create_attack,
+            destroy_attack,
+            create_magic,
+            player_data,
+        )
+        self.patrol_points = patrol_points or [self.rect.center]
+        self._patrol_index = 0
+        self.attack_interval = attack_interval
+        self._last_attack_ts = pygame.time.get_ticks()
+        self.patrol_tolerance = patrol_tolerance
+        self.auto_attack = auto_attack
+
+    def input(self):
+        """Drive the player toward the next patrol point and auto-attack."""
+        if not self.patrol_points:
+            self.direction.update(0, 0)
+            return
+
+        target = pygame.math.Vector2(self.patrol_points[self._patrol_index])
+        current = pygame.math.Vector2(self.rect.center)
+        delta = target - current
+
+        if delta.length() <= self.patrol_tolerance:
+            # Advance to the next waypoint once close enough.
+            self._patrol_index = (self._patrol_index + 1) % len(self.patrol_points)
+            self.direction.update(0, 0)
+        else:
+            move_direction = delta.normalize()
+            self.direction.update(move_direction.x, move_direction.y)
+            if abs(self.direction.x) > abs(self.direction.y):
+                self.status = 'right' if self.direction.x > 0 else 'left'
+            else:
+                self.status = 'down' if self.direction.y > 0 else 'up'
+
+        if not self.auto_attack:
+            return
+
+        now = pygame.time.get_ticks()
+        if not self.attacking and now - self._last_attack_ts >= self.attack_interval:
+            self.attacking = True
+            self.attack_time = now
+            self.create_attack()
+            self.weapon_attack_sound.play()
+            self._last_attack_ts = now

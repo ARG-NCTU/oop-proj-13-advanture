@@ -75,6 +75,14 @@ classDiagram
         +update()
     }
 
+    class AutoPlayer {
+        -patrol_points
+        -attack_interval
+        -patrol_tolerance
+        -auto_attack
+        +input()
+    }
+
     class Enemy {
         -monster_name
         -health
@@ -179,6 +187,7 @@ classDiagram
 
     Entity <|-- Player
     Entity <|-- Enemy
+    Player <|-- AutoPlayer
 
     MagicPlayer --> AnimationPlayer : uses
     AnimationPlayer *-- ParticleEffect
